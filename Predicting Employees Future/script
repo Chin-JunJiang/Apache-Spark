@@ -1,0 +1,238 @@
+# Databricks notebook source
+# MAGIC %md
+# MAGIC 
+# MAGIC ## Predicting Employees Future
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC 
+# MAGIC ## Ingesting Data
+
+# COMMAND ----------
+
+from pyspark.sql.types import *
+from pyspark.sql.functions import *
+ 
+from pyspark.ml import Pipeline
+from pyspark.ml.feature import OneHotEncoder,StringIndexer,VectorAssembler
+
+# COMMAND ----------
+
+# File location and type
+file_location = "s3://employeeleavingornot/Employee.csv"
+file_type = "csv"
+
+# CSV options
+infer_schema = "True"
+first_row_is_header = "True"
+delimiter = ","
+
+# The applied options are for CSV files. For other file types, these will be ignored.
+df = spark.read.format(file_type) \
+  .option("inferSchema", infer_schema) \
+  .option("header", first_row_is_header) \
+  .option("sep", delimiter) \
+  .load(file_location)
+
+display(df)
+
+# COMMAND ----------
+
+df.printSchema()
+
+# COMMAND ----------
+
+df.count()
+
+# COMMAND ----------
+
+df.columns
+
+# COMMAND ----------
+
+df_Columns=['Education', 'JoiningYear', 'City', 'PaymentTier', 'Age', 'Gender', 'EverBenched', 'ExperienceInCurrentDomain', 'LeaveOrNot']
+df.select([count(when(isnan(c) | col(c).isNull(), c)).alias(c) for c in df_Columns]).show()
+
+# COMMAND ----------
+
+df.show(5)
+
+# COMMAND ----------
+
+df.select("Education").distinct().show()
+
+# COMMAND ----------
+
+df.select("City").distinct().show()
+
+# COMMAND ----------
+
+df.select("ExperienceInCurrentDomain").distinct().orderBy("ExperienceInCurrentDomain").show()
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Splitting Data
+
+# COMMAND ----------
+
+(train_data,test_data) = df.randomSplit([0.7,0.3],42)
+ 
+print("Count of Training records: " + str(train_data.count()))
+print("Count of Training records: " + str(test_data.count()))
+
+# COMMAND ----------
+
+categorical_columns = ['Education', 'City', 'Gender', 'EverBenched']
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC 
+# MAGIC ## Building Machine Learning Pipeline
+
+# COMMAND ----------
+
+stages = []
+#iterating each columns for the specified categorical columns
+for catcol in categorical_columns:
+    #passing the categorical column into the string indexer for indexing the string values into a numerical values
+    stringIndexer = StringIndexer(inputCol=catcol,outputCol=catcol + "Index")
+    #taking the output of the string indexer and passing it into the one hot encoder as input
+    #the created categorical vector has n columns for the n types of categorical values within each column
+    encoder = OneHotEncoder(inputCols=[stringIndexer.getOutputCol()],outputCols=[catcol +"Category_vectors"])
+    #stages is used for the pipeline structure creation, no transformation or fitting is done
+    stages += [stringIndexer,encoder]
+
+# COMMAND ----------
+
+stages
+
+# COMMAND ----------
+
+numerical_columns = ['JoiningYear', 'PaymentTier', 'Age', 'ExperienceInCurrentDomain']
+
+# COMMAND ----------
+
+#bringing the categorical columns and numerical columns togeter to be passed into vector assembler
+assembleInputs = [c + "Category_vectors" for c in categorical_columns ] + numerical_columns
+#vector assembler takes all the values and create an array which is the inputs for the models
+assembler = VectorAssembler(inputCols=assembleInputs,outputCol='features')
+stages += [assembler]
+
+# COMMAND ----------
+
+stages
+
+# COMMAND ----------
+
+pipeline = Pipeline().setStages(stages)
+pipelineModel = pipeline.fit(train_data)
+
+# COMMAND ----------
+
+model =pipeline.fit(train_data)
+pipelineModel = pipeline.fit(train_data) 
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Training and Testing Model
+
+# COMMAND ----------
+
+trainprepDF = pipelineModel.transform(train_data)
+testprepDF = pipelineModel.transform(test_data)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ##Logistic Regression
+
+# COMMAND ----------
+
+from pyspark.ml.classification import LogisticRegression
+from pyspark.ml.evaluation import RegressionEvaluator
+
+lr = LogisticRegression(featuresCol="features",labelCol='LeaveOrNot')
+lrModel=lr.fit(trainprepDF)
+lrModelpredictions = lrModel.transform(testprepDF)
+evaluator = RegressionEvaluator(
+    labelCol="LeaveOrNot", predictionCol="prediction", metricName="rmse")
+rmse = evaluator.evaluate(lrModelpredictions)
+model_accuracy =lrModel.summary.accuracy
+print("Root Mean Squared Error (RMSE) on test data = %g" % rmse)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Decision Tree Regressor
+
+# COMMAND ----------
+
+from pyspark.ml.regression import DecisionTreeRegressor
+
+dtr = DecisionTreeRegressor(featuresCol="features",labelCol='LeaveOrNot')
+dtrModel=dtr.fit(trainprepDF)
+dtrModelpredictions = dtrModel.transform(testprepDF)
+evaluator = RegressionEvaluator(
+    labelCol="LeaveOrNot", predictionCol="prediction", metricName="rmse")
+rmse = evaluator.evaluate(dtrModelpredictions)
+print("Root Mean Squared Error (RMSE) on test data = %g" % rmse)
+
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Random Forest Regressor
+
+# COMMAND ----------
+
+from pyspark.ml.regression import RandomForestRegressor
+rfr = RandomForestRegressor(featuresCol="features",labelCol='LeaveOrNot')
+rfrModel=rfr.fit(trainprepDF)
+rfrModelpredictions = rfrModel.transform(testprepDF)
+evaluator = RegressionEvaluator(
+    labelCol="LeaveOrNot", predictionCol="prediction", metricName="rmse")
+rmse = evaluator.evaluate(rfrModelpredictions)
+print("Root Mean Squared Error (RMSE) on test data = %g" % rmse)
+
+
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Gradient Boosted Tree Regressor
+
+# COMMAND ----------
+
+from pyspark.ml.regression import GBTRegressor
+GBTR = GBTRegressor(featuresCol="features",labelCol='LeaveOrNot')
+GBTRModel=GBTR.fit(trainprepDF)
+GBTRModelpredictions = GBTRModel.transform(testprepDF)
+evaluator = RegressionEvaluator(
+    labelCol="LeaveOrNot", predictionCol="prediction", metricName="rmse")
+rmse = evaluator.evaluate(GBTRModelpredictions)
+print("Root Mean Squared Error (RMSE) on test data = %g" % rmse)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ##  Isotonic Regression
+
+# COMMAND ----------
+
+from pyspark.ml.regression import IsotonicRegression
+IR = IsotonicRegression(featuresCol="features",labelCol='LeaveOrNot')
+IRModel=IR.fit(trainprepDF)
+IRModelpredictions = IRModel.transform(testprepDF)
+evaluator = RegressionEvaluator(
+    labelCol="LeaveOrNot", predictionCol="prediction", metricName="rmse")
+rmse = evaluator.evaluate(IRModelpredictions)
+print("Root Mean Squared Error (RMSE) on test data = %g" % rmse)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### Gradient Boosted Tree Regressor is the best performing model with the lowest Root Mean Square Error of 0.343384.
