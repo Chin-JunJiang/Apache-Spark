@@ -1,6 +1,6 @@
 # San Francisco Police Reports
 
-![Projects (1)](https://user-images.githubusercontent.com/91453263/153616077-7098b884-c738-4298-967f-667e2d2150a7.jpeg)
+![Projects - Page 2](https://user-images.githubusercontent.com/91453263/153695503-f1d37881-da20-4e22-b0d1-a6bb55cf3b8f.png)
 
 ## Project's Objectives
 Apache Spark is an open-source, distributed processing system which utilizes in-memory caching, and optimized query execution for fast analytic queries against data of any size. 
