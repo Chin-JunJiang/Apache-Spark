@@ -243,7 +243,7 @@ Count_of_Described_Felonies_committed_Based_on_PdDistrict.write.format('csv').sa
 # Total Count of resolved Cases out of total cases
 Percentage_of_resolved_cases = spark.sql('SELECT COUNT(RESOLUTION) AS Total_Number_of_Cases, \
                                 A.Resolved_Cases AS Total_Number_of_Resolved_Cases \
-                               , ROUND(COUNT(RESOLUTION)/A.Resolved_Cases,2) AS Percentage_of_Resolved_Cases \
+                               , ROUND(A.Resolved_Cases/COUNT(RESOLUTION)*100,2) AS Percentage_of_Resolved_Cases \
                                FROM df_view , (SELECT COUNT(RESOLUTION) AS Resolved_Cases \
                                FROM df_view WHERE Resolution != "NONE" ) AS A GROUP BY A.Resolved_Cases ').show(truncate=False)
 
