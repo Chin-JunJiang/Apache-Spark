@@ -1,6 +1,7 @@
 # Predicting Employees Future
 
-![Projects (2)](https://user-images.githubusercontent.com/91453263/153621139-7b85f558-736b-4118-bf7a-45b6a922cb84.jpeg)
+![Projects (1)](https://user-images.githubusercontent.com/91453263/153695179-522c0b2e-2656-40e6-87a4-c7d869561abe.png)
+
 
 ## Project's Objectives
 Apache Spark is an open-source, distributed processing system which utilizes in-memory caching, and optimized query execution for fast analytic queries against data of any size.
